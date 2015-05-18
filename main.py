@@ -1,7 +1,7 @@
 """Author: Jeremy Overman"""
 
 import wx, winsound
-import sqlite3 as sql
+import database
 
 class Text(wx.StaticText):
     def __init__(self, *args, **kwargs):
@@ -61,7 +61,7 @@ class MainPanel(wx.Panel):
         panel.makeActive()
         
     def goHome(self):
-        self.setBodyPanel(gui.asset_panel)
+        self.setBodyPanel(gui.barcode_panel)
 
 class InventoryPanel(wx.Panel):
     def __init__(self, *args, **kwargs):
@@ -105,8 +105,8 @@ class InventoryPanel(wx.Panel):
         
     def setItem(self, sku):
         self.sku = sku
-        self.name = database.getNameFromSku(sku)
-        self.count = database.getCountFromSku(sku)
+        self.name = db.getNameFromSku(sku)
+        self.count = db.getCountFromSku(sku)
         
         self.item_label.SetLabel(self.name)
         self.item_count.SetLabel(str(self.count))
@@ -114,7 +114,7 @@ class InventoryPanel(wx.Panel):
     def changeCount(self, by):
         self.count += by
         self.item_count.SetLabel(str(self.count))
-        database.setCountForSKU(self.sku, self.count)
+        db.setCountForSKU(self.sku, self.count)
     
     def handleKeys(self, e):
         if e.GetUniChar() == 61:
@@ -124,49 +124,41 @@ class InventoryPanel(wx.Panel):
         else:
             if e.GetUniChar() > 0:
                 character = chr(e.GetKeyCode())
-                gui.asset_panel.asset_input.AppendText(character)
-                gui.main_panel.setBodyPanel(gui.asset_panel)
+                gui.barcode_panel.asset_input.AppendText(character)
+                gui.main_panel.setBodyPanel(gui.barcode_panel)
 
-class AssetPanel(wx.Panel):
+class BarcodePanel(wx.Panel):
     def __init__(self, *args, **kwargs):
         wx.Panel.__init__(self, *args, **kwargs)
         
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        self.asset_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.asset_label = Text(self, label="Asset ID")
-        self.asset_input = InputBox(self, size=(500,50))
-        self.asset_button = wx.Button(self, label="GO", size=(72,52))
+        self.barcode_input = Input(self, "Barcode")
+        self.barcode_input.AddButton("GO")
         
-        self.main_sizer.Add(self.asset_sizer, 1, wx.EXPAND|wx.HORIZONTAL|wx.TOP, 100)
-        self.asset_sizer.Add((0,0), 1, wx.EXPAND|wx.HORIZONTAL)
-        self.asset_sizer.Add(self.asset_label, 0, wx.CENTER)
-        self.asset_sizer.Add(self.asset_input, 0, wx.CENTER|wx.LEFT, 15)
-        self.asset_sizer.Add(self.asset_button, 0, wx.CENTER)
-        self.asset_sizer.Add((0,0), 1, wx.EXPAND|wx.HORIZONTAL)
+        self.main_sizer.Add(self.barcode_input.sizer, 1, wx.EXPAND|wx.HORIZONTAL|wx.TOP, 100)
         
-        self.asset_button.SetFont(DEFAULTFONT)
-        self.asset_button.Bind(wx.EVT_BUTTON, lambda x: self.handleBarcode())
-        self.asset_button.SetDefault()
+        self.barcode_input.button.Bind(wx.EVT_BUTTON, lambda x: self.handleBarcode())
+        self.barcode_input.button.SetDefault()
         
         self.SetSizerAndFit(self.main_sizer)
         self.Layout()
         
     def makeActive(self):
-        self.asset_button.SetDefault()
+        self.barcode_input.button.SetDefault()
         
     def handleBarcode(self):
-        barcode = self.asset_input.GetValue()
+        barcode = self.barcode_input.GetValue()
         if len(barcode) > 0:
-            self.asset_input.Clear()
+            self.barcode_input.Clear()
             
-            sku = database.getSKUFromAssetCode(barcode)
+            sku = db.getSKUFromAssetCode(barcode)
             if not sku:
                 dialog = AddSKUDialog("SKU Doesn't Exist\n\nAdd SKU?", self)
                 if dialog.getResponse():
-                    sku = database.addSKU(barcode, barcode)
+                    sku = db.addSKU(barcode, barcode)
                 else:
-                    gui.asset_panel.asset_input.SetFocus()
+                    self.barcode_input.SetFocus()
                     return
             
             gui.inventory_panel.setItem(sku)
@@ -218,6 +210,36 @@ class AddSKUDialog(wx.Dialog):
     def getResponse(self):
         return self.add_sku
 
+class Input(InputBox):
+    def __init__(self, parent, label, *args, **kwargs):
+        self.parent = parent
+        
+        InputBox.__init__(self, self.parent, *args, **kwargs)
+        
+        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.label = wx.StaticText(self.parent, label=label)
+        self.label.SetFont(DEFAULTFONT)
+        self.button = None
+        
+        self.sizer.Add(self.label, 0, wx.CENTER)
+        self.sizer.Add(self, 1, wx.CENTER|wx.LEFT, 15)
+        
+    def AddButton(self, label):
+        width = len(label) * 36
+        self.button = wx.Button(self.parent, label=label, size=(width,55))
+        self.button.SetFont(DEFAULTFONT)
+        self.sizer.Add(self.button, 0, wx.CENTER)
+
+class PCInventory(wx.Panel):
+    def __init__(self, *args, **kwargs):
+        wx.Panel.__init__(self, *args, **kwargs)
+        
+        self.main_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.tag_sizer = Input()
+
+        self.SetSizerAndFit(self.main_sizer)
+        self.Layout()
+
 class GUI(wx.Frame):
     def __init__(self, *args, **kwargs):
         wx.Frame.__init__(self, None, *args, **kwargs)
@@ -225,53 +247,22 @@ class GUI(wx.Frame):
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         
         self.main_panel = MainPanel(self)
-        self.asset_panel = AssetPanel(self.main_panel)
+        self.barcode_panel = BarcodePanel(self.main_panel)
         self.inventory_panel = InventoryPanel(self.main_panel)
+        self.pc_inventory_panel = PCInventory(self.main_panel)
         
-        self.main_panel.addBodyPanel(self.asset_panel)
+        self.main_panel.addBodyPanel(self.barcode_panel)
         self.main_panel.addBodyPanel(self.inventory_panel)
+        self.main_panel.addBodyPanel(self.pc_inventory_panel)
         
         self.inventory_panel.Hide()
-        #self.asset_panel.Hide()
-        self.main_panel.setBodyPanel(self.asset_panel)
-        #self.main_panel.setBodyPanel(self.inventory_panel)
+        self.pc_inventory_panel.Hide()
+        self.main_panel.setBodyPanel(self.barcode_panel)
                 
         self.Show()
-
-class Database():
-    def __init__(self):
-        self.conn = sql.connect("database.db")
-
-    def addSKU(self, assetcode, name):
-        result = self.conn.execute("INSERT INTO AssetTags VALUES (NULL, '%s', '%s', 0)" % (assetcode, name))
-        self.conn.commit()
-        return result.lastrowid
-        
-        
-    def getSKUFromAssetCode(self, assetcode):
-        result = self.conn.execute("SELECT sku FROM AssetTags WHERE AssetTags.assetcode = '%s'" % assetcode)
-        sku = result.fetchone()
-        if sku:
-            return sku[0]
-        else:
-            return None
-    
-    def getNameFromSku(self, sku):
-        result = self.conn.execute("SELECT name FROM AssetTags WHERE AssetTags.sku = '%s'" % sku)
-        name = result.fetchone()
-        return name[0]
-    
-    def getCountFromSku(self, sku):
-        result = self.conn.execute("SELECT count FROM AssetTags WHERE AssetTags.sku = '%s'" % sku)
-        count = result.fetchone()
-        return count[0]
-    
-    def setCountForSKU(self, sku, count):
-        result = self.conn.execute("UPDATE AssetTags SET count='%s' WHERE sku='%s'" % (count, sku))
-        self.conn.commit()
         
 if __name__ == "__main__":
-    database = Database()
+    db = database.Database()
     
     app = wx.App()
     
