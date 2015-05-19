@@ -17,6 +17,12 @@ class MenuBar(wx.MenuBar):
         
         self.filter_menu = wx.Menu()
         self.Append(self.filter_menu, "Fi&lters")
+        
+        self.view_menu = wx.Menu()
+        self.Append(self.view_menu, "&View")
+        
+        self.help_menu = wx.Menu()
+        self.Append(self.help_menu, "&Help")
 
 class Icons():
     def __init__(self):
@@ -43,7 +49,7 @@ class NavPanel(wx.Panel):
         wx.Panel.__init__(self, *args, **kwargs)
         
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.nav_tree = NavTree(self, size=(150,1))
+        self.nav_tree = NavTree(self, size=(100,1))
         
         self.main_sizer.Add(self.nav_tree, 1, wx.EXPAND|wx.BOTH)
         
@@ -54,6 +60,22 @@ class Grid(wx.grid.Grid):
         wx.grid.Grid.__init__(self, *args, **kwargs)
         
         self.CreateGrid(0,3)
+        self.SetLabelBackgroundColour(wx.Colour(255,255,255))
+        
+        label_font = self.GetLabelFont()
+        
+        #Create corner label
+        corner = self.GridCornerLabelWindow
+        corner_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        sku_label = wx.StaticText(corner, label="SKU")
+        sku_label.SetFont(label_font)
+        
+        corner_sizer.Add((0,0), 1, wx.EXPAND|wx.BOTH)
+        corner_sizer.Add(sku_label, 0, wx.CENTER)
+        corner_sizer.Add((0,0), 1, wx.EXPAND|wx.BOTH)
+        
+        corner.SetSizerAndFit(corner_sizer)
         
         self.SetColLabelValue(0, "Name")
         self.SetColLabelValue(1, "Quantity")
@@ -71,6 +93,7 @@ class Grid(wx.grid.Grid):
             self.fillRow(i, (name, count, barcode))
             
             i += 1
+        self.AutoSizeColumns()
             
     def fillRow(self, row, values):
         col = 0
@@ -82,39 +105,66 @@ class GridPanel(wx.Panel):
     def __init__(self, *args, **kwargs):
         wx.Panel.__init__(self, *args, **kwargs)
         
-        self.main_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        self.main_grid = Grid(self)
+        self.splitter = wx.SplitterWindow(self)
         
-        self.main_sizer.Add(self.main_grid, 1)
+        self.nav_panel = NavPanel(self.splitter)
+        self.main_grid = Grid(self.splitter)
+        
+        self.splitter.SplitVertically(self.nav_panel, self.main_grid)
+        self.splitter.SetMinimumPaneSize(10)
+        #self.splitter.SetSashGravity(0.1)
+        
+        self.main_sizer.Add(self.splitter, 1, wx.EXPAND|wx.BOTH|wx.BOTTOM, 5)
         
         self.SetSizerAndFit(self.main_sizer)
         
         self.Layout()
 
+class PropertiesNotebook(wx.Notebook):
+    def __init__(self, *args, **kwargs):
+        wx.Notebook.__init__(self, *args, **kwargs)
+        
+        panel = wx.Panel(self)
+        
+        self.container_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.container_sizer.Add(self, 1, wx.EXPAND|wx.BOTH|wx.TOP, 5)
+        
+        self.AddPage(panel, "View 1")
+        self.AddPage(panel, "View 2")
+        self.AddPage(panel, "View 3")
+        
+        self.Parent.SetSizerAndFit(self.container_sizer)
+        
 class PropertiesPanel(wx.Panel):
     def __init__(self, *args, **kwargs):
         wx.Panel.__init__(self, *args, **kwargs)
         
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         
-        self.SetSizer(self.main_sizer)
-        self.Layout()
+        self.notebook = PropertiesNotebook(self, size=(1, 150))
+        
+        self.main_sizer.Add(self.notebook, 1, wx.EXPAND|wx.BOTH|wx.TOP, 5)
+        
+        self.SetSizerAndFit(self.main_sizer)
 
 class MainPanel(wx.Panel):
     def __init__(self, *args, **kwargs):
         wx.Panel.__init__(self, *args, **kwargs)
         
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.top_hor_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.nav_panel = NavPanel(self)
-        self.grid_panel = GridPanel(self)
-        self.properties_panel = PropertiesPanel(self, size=(200, 200))
         
-        self.main_sizer.Add(self.top_hor_sizer, 1, wx.EXPAND|wx.BOTH)
-        self.top_hor_sizer.Add(self.nav_panel, 0, wx.EXPAND|wx.VERTICAL|wx.RIGHT, 5)
-        self.top_hor_sizer.Add(self.grid_panel, 1, wx.EXPAND|wx.BOTH)
-        self.main_sizer.Add(self.properties_panel, 0, wx.EXPAND|wx.BOTH)
+        self.hor_splitter = wx.SplitterWindow(self, style=wx.SP_NO_XP_THEME | wx.SP_3D | wx.SP_LIVE_UPDATE)
+        self.grid_panel = GridPanel(self.hor_splitter)
+        self.properties_panel = PropertiesPanel(self.hor_splitter)
+        
+        self.hor_splitter.SetSashGravity(0.85)
+        
+        self.hor_splitter.SplitHorizontally(self.grid_panel, self.properties_panel)
+        self.hor_splitter.SetMinimumPaneSize(100)
+        
+        self.main_sizer.Add(self.hor_splitter,1,wx.EXPAND|wx.BOTH)
         
         self.SetSizerAndFit(self.main_sizer)
         self.Layout()
@@ -146,7 +196,7 @@ if __name__ == '__main__':
     
     icons = Icons()
     
-    gui = GUI(None, size=(640,480))
+    gui = GUI(None, -1, "Inventory Viewer", size=(640,480))
     
     items = getItemList()
     

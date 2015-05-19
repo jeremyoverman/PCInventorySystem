@@ -235,7 +235,7 @@ class PCInventory(wx.Panel):
         wx.Panel.__init__(self, *args, **kwargs)
         
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.tag_sizer = Input()
+        self.tag_input = Input(self, "Asset Tag")
 
         self.SetSizerAndFit(self.main_sizer)
         self.Layout()
@@ -271,6 +271,6 @@ if __name__ == "__main__":
              wx.FONTSTYLE_NORMAL,
              wx.FONTWEIGHT_BOLD)
     
-    gui = GUI(size=(800,800))
+    gui = GUI(-1, "Inventory", size=(800,800))
     
     app.MainLoop()
