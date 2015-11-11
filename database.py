@@ -1,49 +1,61 @@
-'''
-Created on May 11, 2015
+import _mssql, decimal, uuid
+import pymssql, datetime
 
-@author: Jeremy
-'''
-
-import sqlite3 as sql
+class Dell():
+    def __init__(self, parent):
+        self.parent = parent
+        self.conn = parent.conn
+        self.cursor = parent.cursor
+        
+    def addPC(self, serial, enddate, ordernum, model):
+        enddate = self.parent.convertDate(enddate)
+        self.cursor.execute(
+            "INSERT INTO dell_assets VALUES ('%s', '%s', '%s', '%s')" %
+            (serial, enddate, ordernum, model)
+        )
+        self.conn.commit()
+        
+    def getInfo(self, serial):
+        self.cursor.execute("SELECT warranty_expires, order_number, model FROM dell_assets WHERE service_tag = '%s'" % serial)
+        row = self.cursor.fetchone()
+        return row[0], row[1], row[2]
 
 class Database():
     def __init__(self):
-        self.conn = sql.connect("database.db")
-
-    def addSKU(self, assetcode, name):
-        result = self.conn.execute("INSERT INTO AssetTags VALUES (NULL, '%s', '%s', 0)" % (assetcode, name))
+        self.conn = pymssql.connect("tireid2.wilson.com", "bfusa\overmanjerem", "Swf1067pw12", "ITInventory")
+        
+        self.cursor = self.conn.cursor()
+        
+        self.Dell = Dell(self)
+        
+    def isDefective(self, serial):
+        self.cursor.execute("SELECT date FROM defects WHERE serial = '%s'" % serial)
+        row = self.cursor.fetchone()
+        
+        if row: return True
+        else: return False
+        
+    def markDefective(self, serial):
+        date = self.convertDate(datetime.date.today())
+        self.cursor.execute("INSERT INTO defects VALUES ('%s', '%s')" % (serial, date))
         self.conn.commit()
-        return result.lastrowid
         
+    def convertDate(self, date):
+        return date.strftime("%Y%m%d")
+
+    def getManufacturer(self, serial):
+        self.cursor.execute("SELECT manufacturer FROM pc_assets WHERE serial='%s'" % serial)
+        row = self.cursor.fetchone()
         
-    def getSKUFromAssetCode(self, assetcode):
-        result = self.conn.execute("SELECT sku FROM AssetTags WHERE AssetTags.assetcode = '%s'" % assetcode)
-        sku = result.fetchone()
-        if sku:
-            return sku[0]
+        if row:
+            return row[0]
         else:
             return None
-    
-    def getNameFromSku(self, sku):
-        result = self.conn.execute("SELECT name FROM AssetTags WHERE AssetTags.sku = '%s'" % sku)
-        name = result.fetchone()
-        return name[0]
-    
-    def getCountFromSku(self, sku):
-        result = self.conn.execute("SELECT count FROM AssetTags WHERE AssetTags.sku = '%s'" % sku)
-        count = result.fetchone()
-        return count[0]
-    
-    def setCountForSKU(self, sku, count):
-        result = self.conn.execute("UPDATE AssetTags SET count='%s' WHERE sku='%s'" % (count, sku))
-        self.conn.commit()
-    
-    def getDatabaseItems(self):
-        result = self.conn.execute("SELECT * from AssetTags")
-        return result.fetchall()
 
-if __name__ == '__main__':
-    db = Database()
-    items = db.getDatabaseItems()
-    
-    
+    def addPC(self, serial, manufacturer):
+        self.cursor.execute("INSERT INTO pc_assets VALUES ('%s', '%s')" % (serial, manufacturer))
+        self.conn.commit()
+
+if __name__ == "__main__":
+    database = Database()
+    print database.getManufacturer("gvn7zq1")

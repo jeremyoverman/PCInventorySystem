@@ -266,6 +266,11 @@ if __name__ == "__main__":
     
     app = wx.App()
     
+    from numpad import NumberPad
+    
+    pad = NumberPad(None)
+    pad.Show()
+    
     DEFAULTFONT = wx.Font(36,
              wx.FONTFAMILY_DEFAULT,
              wx.FONTSTYLE_NORMAL,

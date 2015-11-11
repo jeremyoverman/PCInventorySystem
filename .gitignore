@@ -2,3 +2,5 @@
 .project
 .pydevproject
 Thumbs.db
+build/
+dist/
